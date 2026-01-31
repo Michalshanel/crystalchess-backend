@@ -1,0 +1,499 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId              Int                @id @default(autoincrement()) @map("user_id")
+  email               String             @unique(map: "email") @db.VarChar(255)
+  passwordHash        String             @map("password_hash") @db.VarChar(255)
+  fullName            String             @map("full_name") @db.VarChar(100)
+  phone               String?            @db.VarChar(20)
+  profilePicture      String?            @map("profile_picture") @db.VarChar(255)
+  userType            UserType?          @default(PLAYER) @map("user_type")
+  organizerApproved   Boolean            @default(false) @map("organizer_approved")
+  userStatus          UserStatus?        @default(ACTIVE) @map("user_status")
+  emailVerified       Boolean?           @default(false) @map("email_verified")
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  lastLogin           DateTime?          @map("last_login") @db.Timestamp(0)
+  auditLogs           AuditLog[]
+  bookings            Booking[]
+  event_edit_requests EventEditRequest[]
+  organizedEvents     Event[]            @relation("OrganizerEvents")
+  notifications       Notification[]
+  participants        Participant[]
+  passwordResets      PasswordReset[]
+  sessions            Session[]
+
+  @@index([userType], map: "idx_user_type")
+  @@index([userStatus], map: "idx_status")
+  @@index([email], map: "idx_email")
+  @@map("users")
+}
+
+model Participant {
+  participantId       Int                  @id @default(autoincrement()) @map("participant_id")
+  userId              Int                  @map("user_id")
+  fullName            String               @map("full_name") @db.VarChar(100)
+  dateOfBirth         DateTime             @map("date_of_birth") @db.Date
+  gender              Gender
+  eventRated          EventType?           @map("event_rated")
+  contactNumber       String?              @map("contact_number") @db.VarChar(20)
+  email               String?              @db.VarChar(255)
+  passportPhoto       String?              @map("passport_photo") @db.VarChar(255)
+  fideId              String?              @map("fide_id") @db.VarChar(50)
+  birthCertificate    String?              @map("birth_certificate") @db.VarChar(255)
+  aadharCard          String?              @map("aadhar_card") @db.VarChar(255)
+  isGovtStudent       Boolean?             @default(false) @map("is_govt_student")
+  createdAt           DateTime?            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime?            @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  bookingParticipants BookingParticipant[]
+  user                User                 @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Restrict, map: "participants_ibfk_1")
+
+  @@index([userId], map: "idx_user")
+  @@index([fullName], map: "idx_full_name")
+  @@index([createdAt], map: "idx_participant_created")
+  @@map("participants")
+}
+
+model Event {
+  eventId             Int                    @id @default(autoincrement()) @map("event_id")
+  organizerId         Int                    @map("organizer_id")
+  eventName           String                 @map("event_name") @db.VarChar(255)
+  description         String?                @db.Text
+  eventDates          String                 @map("event_dates") @db.LongText
+  eventStartTime      DateTime               @map("event_start_time") @db.Time(0)
+  eventEndTime        DateTime?              @map("event_end_time") @db.Time(0)
+  location            String                 @db.VarChar(255)
+  venueAddress        String?                @map("venue_address") @db.Text
+  googleMapLink       String?                @map("google_map_link") @db.Text
+  entryFee            Decimal?               @default(0.00) @map("entry_fee") @db.Decimal(10, 2)
+  prize               String?                @db.Text
+  maxCapacity         Int?                   @map("max_capacity")
+  currentBookings     Int?                   @default(0) @map("current_bookings")
+  rulesText           String?                @map("rules_text") @db.Text
+  rulesPdf            String?                @map("rules_pdf") @db.VarChar(255)
+  eventType           EventType?             @map("event_type")
+  eventStatus         EventStatus?           @default(UPCOMING) @map("event_status")
+  eventImage          String?                @map("event_image") @db.VarChar(255)
+  isOnline            Boolean?               @default(false) @map("is_online")
+  isFeatured          Boolean?               @default(false) @map("is_featured")
+  govtConcessionType  ConcessionType?        @map("govt_concession_type")
+  govtConcessionValue Decimal?               @map("govt_concession_value") @db.Decimal(10, 2)
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  bookingParticipants BookingParticipant[]
+  bookings            Booking[]
+  categories          EventCategoryMapping[]
+  editRequests        EventEditRequest[]
+  organizer           User                   @relation("OrganizerEvents", fields: [organizerId], references: [userId], onDelete: Cascade, onUpdate: Restrict, map: "events_ibfk_1")
+  notifications       Notification[]
+
+  @@index([eventStatus], map: "idx_status")
+  @@index([organizerId], map: "idx_organizer")
+  @@index([eventType], map: "idx_event_type")
+  @@index([eventDates(length: 768)], map: "idx_event_dates")
+  @@index([eventStartTime], map: "idx_event_start_time")
+  @@index([location], map: "idx_location")
+  @@map("events")
+}
+
+model EventCategory {
+  categoryId   Int                    @id @default(autoincrement()) @map("category_id")
+  categoryName String                 @map("category_name") @db.VarChar(50)
+  categoryCode String                 @unique(map: "category_code") @map("category_code") @db.VarChar(10)
+  ageLimit     Int?                   @map("age_limit")
+  description  String?                @db.Text
+  isActive     Boolean?               @default(true) @map("is_active")
+  createdAt    DateTime?              @default(now()) @map("created_at") @db.Timestamp(0)
+  events       EventCategoryMapping[]
+
+  @@map("event_categories")
+}
+
+model EventCategoryMapping {
+  mappingId  Int           @id @default(autoincrement()) @map("mapping_id")
+  eventId    Int           @map("event_id")
+  categoryId Int           @map("category_id")
+  createdAt  DateTime?     @default(now()) @map("created_at") @db.Timestamp(0)
+  category   EventCategory @relation(fields: [categoryId], references: [categoryId], onDelete: Cascade, onUpdate: Restrict, map: "fk_ecm_category")
+  event      Event         @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Restrict, map: "fk_ecm_event")
+
+  @@unique([eventId, categoryId], name: "unique_event_category", map: "unique_event_category")
+  @@index([eventId], map: "idx_event_id")
+  @@index([categoryId], map: "idx_category_id")
+  @@map("event_category_mapping")
+}
+
+model Booking {
+  bookingId        Int                  @id @default(autoincrement()) @map("booking_id")
+  eventId          Int                  @map("event_id")
+  userId           Int                  @map("user_id")
+  bookingReference String               @unique(map: "booking_reference") @map("booking_reference") @db.VarChar(20)
+  bookingStatus    BookingStatus?       @default(PENDING) @map("booking_status")
+  paymentStatus    PaymentStatus?       @default(PENDING) @map("payment_status")
+  amountPaid       Decimal?             @default(0.00) @map("amount_paid") @db.Decimal(10, 2)
+  bookingDate      DateTime             @default(now()) @map("booking_date") @db.Timestamp(0)
+  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  participants     BookingParticipant[]
+  event            Event                @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Restrict, map: "bookings_ibfk_1")
+  user             User                 @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Restrict, map: "bookings_ibfk_2")
+  payments         Payment[]
+
+  @@index([bookingReference], map: "idx_booking_ref")
+  @@index([eventId], map: "idx_event")
+  @@index([userId], map: "idx_user")
+  @@index([bookingStatus], map: "idx_booking_status")
+  @@index([eventId, bookingStatus, paymentStatus], map: "idx_composite_search")
+  @@index([paymentStatus], map: "idx_payment_status")
+  @@map("bookings")
+}
+
+model BookingParticipant {
+  id            Int         @id @default(autoincrement())
+  bookingId     Int         @map("booking_id")
+  participantId Int         @map("participant_id")
+  eventId       Int         @map("event_id")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamp(0)
+  booking       Booking     @relation(fields: [bookingId], references: [bookingId], onDelete: Cascade, onUpdate: Restrict, map: "booking_participants_ibfk_1")
+  participant   Participant @relation(fields: [participantId], references: [participantId], onDelete: Cascade, onUpdate: Restrict, map: "booking_participants_ibfk_2")
+  event         Event       @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Restrict, map: "booking_participants_ibfk_3")
+
+  @@unique([bookingId, participantId], name: "uq_booking_participant", map: "uq_booking_participant")
+  @@index([bookingId], map: "idx_booking")
+  @@index([participantId], map: "idx_participant")
+  @@index([eventId], map: "idx_event")
+  @@map("booking_participants")
+}
+
+model Payment {
+  paymentId       Int                      @id @default(autoincrement()) @map("payment_id")
+  bookingId       Int                      @map("booking_id")
+  transactionId   String?                  @unique(map: "transaction_id") @map("transaction_id") @db.VarChar(100)
+  paymentGateway  payments_payment_gateway @map("payment_gateway")
+  amount          Decimal                  @db.Decimal(10, 2)
+  adminCommission Decimal?                 @default(0.00) @map("admin_commission") @db.Decimal(10, 2)
+  currency        String?                  @default("INR") @db.VarChar(3)
+  paymentStatus   payments_payment_status? @default(pending) @map("payment_status")
+  gatewayResponse String?                  @map("gateway_response") @db.Text
+  paymentDate     DateTime                 @default(now()) @map("payment_date") @db.Timestamp(0)
+  refundDate      DateTime?                @map("refund_date") @db.Timestamp(0)
+  refundAmount    Decimal?                 @map("refund_amount") @db.Decimal(10, 2)
+  booking         Booking                  @relation(fields: [bookingId], references: [bookingId], onDelete: Cascade, onUpdate: Restrict, map: "payments_ibfk_1")
+
+  @@index([transactionId], map: "idx_transaction")
+  @@index([bookingId], map: "idx_booking")
+  @@index([paymentStatus], map: "idx_status")
+  @@map("payments")
+}
+
+model Enrollment {
+  enrollmentId       BigInt            @id @default(autoincrement()) @map("enrollment_id")
+  userId             Int?              @map("user_id")
+  className          String            @map("class_name") @db.VarChar(100)
+  studentName        String            @map("student_name") @db.VarChar(100)
+  studentEmail       String            @map("student_email") @db.VarChar(100)
+  studentPhone       String            @map("student_phone") @db.VarChar(20)
+  studentAge         Int               @map("student_age")
+  parentName         String?           @map("parent_name") @db.VarChar(100)
+  parentPhone        String?           @map("parent_phone") @db.VarChar(20)
+  parentEmail        String?           @map("parent_email") @db.VarChar(100)
+  preferredSchedule  Schedule          @map("preferred_schedule")
+  preferredDays      String?           @map("preferred_days") @db.VarChar(50)
+  address            String?           @db.Text
+  city               String?           @db.VarChar(100)
+  state              String?           @db.VarChar(100)
+  pincode            String?           @db.VarChar(10)
+  previousExperience Experience?       @default(NONE) @map("previous_experience")
+  message            String?           @db.Text
+  enrollmentStatus   EnrollmentStatus? @default(PENDING) @map("enrollment_status")
+  enrollmentDate     DateTime          @default(now()) @map("enrollment_date") @db.DateTime(0)
+  approvedDate       DateTime?         @map("approved_date") @db.DateTime(0)
+  approvedBy         Int?              @map("approved_by")
+  rejectionReason    String?           @map("rejection_reason") @db.Text
+  notes              String?           @db.Text
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@index([className], map: "class_name")
+  @@index([enrollmentStatus], map: "enrollment_status")
+  @@index([userId], map: "user_id")
+  @@map("enrollments")
+}
+
+model EventEditRequest {
+  requestId   Int            @id @default(autoincrement()) @map("request_id")
+  eventId     Int            @map("event_id")
+  organizerId Int            @map("organizer_id")
+  message     String?        @db.Text
+  status      RequestStatus? @default(PENDING)
+  createdAt   DateTime?      @default(now()) @map("created_at") @db.Timestamp(0)
+  event       Event          @relation(fields: [eventId], references: [eventId], onUpdate: Restrict, map: "fk_eer_event")
+  users       User           @relation(fields: [organizerId], references: [userId], onUpdate: Restrict, map: "fk_eer_organizer")
+
+  @@index([eventId], map: "fk_eer_event")
+  @@index([organizerId], map: "fk_eer_organizer")
+  @@map("event_edit_requests")
+}
+
+model FlashNews {
+  id        Int       @id @default(autoincrement())
+  message   String    @db.Text
+  isActive  Boolean?  @default(true) @map("is_active")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@map("flash_news")
+}
+
+model Notification {
+  notificationId     Int                 @id @default(autoincrement()) @map("notification_id")
+  userId             Int?                @map("user_id")
+  eventId            Int?                @map("event_id")
+  recipient          Recipient           @default(ALL)
+  notificationType   NotificationType?   @default(EMAIL) @map("notification_type")
+  subject            String?             @db.VarChar(255)
+  message            String              @db.Text
+  notificationStatus NotificationStatus? @default(PENDING) @map("notification_status")
+  sentAt             DateTime?           @map("sent_at") @db.Timestamp(0)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
+  user               User?               @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Restrict, map: "notifications_ibfk_1")
+  event              Event?              @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Restrict, map: "notifications_ibfk_2")
+
+  @@index([userId], map: "idx_user")
+  @@index([eventId], map: "event_id")
+  @@index([notificationStatus], map: "idx_status")
+  @@map("notifications")
+}
+
+model EmailTemplate {
+  templateId   Int      @id @default(autoincrement()) @map("template_id")
+  templateName String   @unique(map: "template_name") @map("template_name") @db.VarChar(100)
+  subject      String   @db.VarChar(255)
+  body         String   @db.Text
+  variables    String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("email_templates")
+}
+
+model Session {
+  sessionId    String   @id @map("session_id") @db.VarChar(128)
+  userId       Int?     @map("user_id")
+  sessionData  String?  @map("session_data") @db.Text
+  ipAddress    String?  @map("ip_address") @db.VarChar(45)
+  userAgent    String?  @map("user_agent") @db.VarChar(255)
+  lastActivity DateTime @default(now()) @updatedAt @map("last_activity") @db.Timestamp(0)
+  user         User?    @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Restrict, map: "sessions_ibfk_1")
+
+  @@index([userId], map: "idx_user")
+  @@index([lastActivity], map: "idx_last_activity")
+  @@map("sessions")
+}
+
+model PasswordReset {
+  resetId   Int      @id @default(autoincrement()) @map("reset_id")
+  userId    Int      @map("user_id")
+  token     String   @unique(map: "token") @db.VarChar(64)
+  expiresAt DateTime @default(now()) @map("expires_at") @db.Timestamp(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Restrict, map: "password_resets_ibfk_1")
+
+  @@index([token], map: "idx_token")
+  @@index([userId], map: "user_id")
+  @@map("password_resets")
+}
+
+model AuditLog {
+  logId      Int        @id @default(autoincrement()) @map("log_id")
+  adminId    Int        @map("admin_id")
+  action     String     @db.VarChar(100)
+  entityType EntityType @map("entity_type")
+  entityId   Int?       @map("entity_id")
+  oldValues  String?    @map("old_values") @db.Text
+  newValues  String?    @map("new_values") @db.Text
+  ipAddress  String?    @map("ip_address") @db.VarChar(45)
+  userAgent  String?    @map("user_agent") @db.VarChar(255)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  admin      User       @relation(fields: [adminId], references: [userId], onDelete: Cascade, onUpdate: Restrict, map: "audit_logs_ibfk_1")
+
+  @@index([adminId], map: "idx_admin")
+  @@index([createdAt], map: "idx_created")
+  @@index([entityType, entityId], map: "idx_entity")
+  @@map("audit_logs")
+}
+
+model Setting {
+  settingId    Int          @id @default(autoincrement()) @map("setting_id")
+  settingKey   String       @unique(map: "setting_key") @map("setting_key") @db.VarChar(100)
+  settingValue String?      @map("setting_value") @db.Text
+  settingType  SettingType? @default(TEXT) @map("setting_type")
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@index([settingKey], map: "idx_key")
+  @@map("settings")
+}
+
+enum UserType {
+  PLAYER    @map("player")
+  ORGANIZER @map("organizer")
+  ADMIN     @map("admin")
+
+  @@map("user_type")
+}
+
+enum UserStatus {
+  ACTIVE    @map("active")
+  INACTIVE  @map("inactive")
+  SUSPENDED @map("suspended")
+
+  @@map("user_status")
+}
+
+enum Gender {
+  MALE   @map("male")
+  FEMALE @map("female")
+  OTHERS @map("others")
+
+  @@map("gender")
+}
+
+enum EventType {
+  FIDE_RATED         @map("FIDE_RATED")
+  STATE_LEVEL        @map("STATE_LEVEL")
+  DISTRICT_LEVEL     @map("DISTRICT_LEVEL")
+  INTER_SCHOOL_LEVEL @map("INTER_SCHOOL_LEVEL")
+  COLLEGE_LEVEL      @map("COLLEGE_LEVEL")
+
+  @@map("event_type")
+}
+
+enum ConcessionType {
+  RUPEES     @map("rupees")
+  PERCENTAGE @map("percentage")
+
+  @@map("concession_type")
+}
+
+enum EventStatus {
+  UPCOMING    @map("upcoming")
+  IN_PROGRESS @map("in_progress")
+  COMPLETED   @map("completed")
+  CANCELLED   @map("cancelled")
+
+  @@map("event_status")
+}
+
+enum BookingStatus {
+  PENDING   @map("pending")
+  CONFIRMED @map("confirmed")
+  CANCELLED @map("cancelled")
+  COMPLETED @map("completed")
+
+  @@map("booking_status")
+}
+
+enum PaymentStatus {
+  PENDING  @map("pending")
+  PAID     @map("paid")
+  REFUNDED @map("refunded")
+  FAILED   @map("failed")
+
+  @@map("payment_status")
+}
+
+enum Schedule {
+  MORNING   @map("morning")
+  AFTERNOON @map("afternoon")
+  EVENING   @map("evening")
+  WEEKEND   @map("weekend")
+
+  @@map("schedule")
+}
+
+enum Experience {
+  NONE         @map("none")
+  BEGINNER     @map("beginner")
+  INTERMEDIATE @map("intermediate")
+  ADVANCED     @map("advanced")
+
+  @@map("experience")
+}
+
+enum EnrollmentStatus {
+  PENDING   @map("pending")
+  APPROVED  @map("approved")
+  REJECTED  @map("rejected")
+  CANCELLED @map("cancelled")
+
+  @@map("enrollment_status")
+}
+
+enum RequestStatus {
+  PENDING  @map("pending")
+  APPROVED @map("approved")
+  REJECTED @map("rejected")
+
+  @@map("request_status")
+}
+
+enum Recipient {
+  USER        @map("user")
+  PARTICIPANT @map("participant")
+  ALL         @map("all")
+
+  @@map("recipient")
+}
+
+enum NotificationType {
+  EMAIL @map("email")
+  SMS   @map("sms")
+  BOTH  @map("both")
+
+  @@map("notification_type")
+}
+
+enum NotificationStatus {
+  PENDING @map("pending")
+  SENT    @map("sent")
+  FAILED  @map("failed")
+
+  @@map("notification_status")
+}
+
+enum EntityType {
+  USER     @map("user")
+  EVENT    @map("event")
+  BOOKING  @map("booking")
+  PAYMENT  @map("payment")
+  SETTINGS @map("settings")
+
+  @@map("entity_type")
+}
+
+enum SettingType {
+  TEXT    @map("text")
+  NUMBER  @map("number")
+  BOOLEAN @map("boolean")
+  JSON    @map("json")
+
+  @@map("setting_type")
+}
+
+enum payments_payment_gateway {
+  stripe
+  paypal
+  razorpay
+}
+
+enum payments_payment_status {
+  pending
+  completed
+  failed
+  refunded
+}
