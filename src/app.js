@@ -39,12 +39,45 @@ app.use(
   })
 );
 
-// CORS configuration
+// CORS configuration - Allow multiple origins
+const allowedOrigins = [
+  config.frontend.url,
+  "https://crystalchess-frontend-4693yhruh-shanels-projects-1e445506.vercel.app",
+  "https://crystalchess-frontend.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+].filter(Boolean).map(url => url.replace(/\/$/, '')); // Remove trailing slashes
+
 app.use(
   cors({
-    origin: config.frontend.url,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      // Check if origin matches any allowed origin (with or without https://)
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const isAllowed = allowedOrigins.some(allowed => {
+        // Direct match
+        if (normalizedOrigin === allowed) return true;
+        // Match without protocol
+        const originHost = normalizedOrigin.replace(/^https?:\/\//, '');
+        const allowedHost = allowed.replace(/^https?:\/\//, '');
+        if (originHost === allowedHost) return true;
+        // Match Vercel preview URLs (contain vercel.app)
+        if (normalizedOrigin.includes('vercel.app')) return true;
+        return false;
+      });
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+
+      // Log rejected origin for debugging
+      console.log(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
